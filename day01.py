@@ -11,14 +11,11 @@ def day01(inp):
     part1 =  fuels.sum()
 
     tot_fuel = 0
-    for m in ms:
-        mtmp = m
-        while True:
-            fuel = fuel_from_mass(mtmp)
-            if fuel <= 0:
-                break
-            tot_fuel += fuel
-            mtmp = fuel
+    while ms.size:
+        fuels = fuel_from_mass(ms)
+        fuels = fuels[fuels > 0]
+        tot_fuel += fuels.sum()
+        ms = fuels
     part2 = tot_fuel
 
     return part1, part2

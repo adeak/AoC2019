@@ -1,4 +1,44 @@
+import operator
 import itertools
+
+def step_intcode(src, i):
+    """Take a step in an intcode program
+
+    Input:
+        src: list of ints with instructions
+          i: current position of instruction pointer
+
+    Returns in a tuple:
+         op: function to call or None for exit
+     params: the operands for op if any, else []
+      i_out: index of the output if any, else None
+          i: the next index of the instruction pointer
+    """
+
+    ops = {1: operator.add,
+           2: operator.mul,
+           99: None,  # signal exit
+           }
+
+    opcode = src[i]
+    if opcode == 99:
+        n_inps = 0
+        n_outs = 0
+    elif opcode in [1, 2]:
+        n_inps = 2
+        n_outs = 1
+    else:
+        assert False, f'Invalid opcode {opcode} at position {i}!'
+
+    op = ops.get(opcode, -1)
+    assert op != -1, f'Need to implement more operations in ops dict!'
+
+    params = [src[src[k]] for k in range(i + 1, i + 1 + n_inps)]
+    i_out = src[i + 1 + n_inps] if n_outs else None
+    i += 1 + n_inps + n_outs
+
+    return op, params, i_out, i
+
 
 def day02(inp, nounverb=(12, 2)):
     src = list(map(int, inp.strip().split(',')))
@@ -8,22 +48,12 @@ def day02(inp, nounverb=(12, 2)):
     
     i = 0
     while True:
-        op = src[i]
-        if op == 99:
+        op, params, i_out, i = step_intcode(src, i)
+        if not op:
+            # exit
             break
-        if op in [1, 2]:
-            in1,in2 = src[src[i + 1]], src[src[i + 2]]
-            i_out = src[i + 3]
-            i += 4
-            if op == 1:
-                res = in1 + in2
-            elif op == 2:
-                res = in1 * in2
-            else:
-                assert False, 'Implement more ops!'
-            src[i_out] = res
-            continue
-        assert False, f'Invalid opcode {op} at position {i}!'
+        
+        src[i_out] = op(*params)
     return src[0]
 
 def day02b(inp):

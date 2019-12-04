@@ -139,7 +139,7 @@ def day03(inp):
 
 
 if __name__ == "__main__":
-    testinp = open('day03.testinp2').read()
+    testinp = open('day03.testinp').read()
     print(day03(testinp))
     inp = open('day03.inp').read()
     print(day03(inp))

@@ -76,18 +76,17 @@ def day05(inp, incode=1):
     src = list(map(int, inp.strip().split(',')))
 
     i = 0
+    outputs = []
     while True:
         op, params, i_out, i = step_intcode(src, i, incode)
 
         if op is None:
-            # exit, should never happen
-            assert False, 'Code exited without nonzero output!'
+            # exit
+            break
 
         if op == 'out':
             # output is in params[0]
-            out = params[0]
-            if out:
-                return out
+            outputs.append(params[0])
             continue
 
         if op in ['jmpif', 'jmpifn']:
@@ -102,6 +101,9 @@ def day05(inp, incode=1):
             res = op(*params)
 
         src[i_out] = res
+
+    assert not any(outputs[:-1]), f'Nonzero output found before halting! Outputs = {outputs}'
+    return outputs[-1]
 
 if __name__ == "__main__":
     inp = open('day05.inp').read()

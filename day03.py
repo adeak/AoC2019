@@ -30,7 +30,7 @@ def get_wires(inp):
             elif dir == 'D':
                 piece[:, 1] = -l
             else:
-                assert True, f'Invalid direction {dir}!'
+                assert False, f'Invalid direction {dir}!'
             row.append(pos + piece)
             pos += piece[-1, :]
         rows.append(np.concatenate(row))

@@ -10,7 +10,8 @@ class Planet:
         child.parent = self
 
     def inherit_orbits(self):
-        self.totorbits = self.parent.totorbits + 1
+        if self.parent:
+            self.totorbits = self.parent.totorbits + 1
 
 
 def day06(inp):
@@ -36,18 +37,16 @@ def day06(inp):
             # we're all done
             break
 
-        nxt = stack.pop(-1)
+        planet = stack.pop(-1)
+        planet.inherit_orbits()
+        bigtotal += planet.totorbits
 
-        for child in nxt.children:
-            child.inherit_orbits()
-            bigtotal += child.totorbits
+        if planet.name == 'YOU':
+            me = planet
 
-            if child.children:
-                next_stack.append(child)
+        if planet.children:
+            next_stack.extend(planet.children)
 
-            # for part 2
-            if child.name == 'YOU':
-                me = child
 
     part1 = bigtotal
 
@@ -65,19 +64,19 @@ def day06(inp):
         if not stack:
             # we're all done
             break
-        nxt = stack.pop(-1)
+        planet = stack.pop(-1)
 
-        if nxt in seens:
+        if planet in seens:
             continue
-        seens.add(nxt)
+        seens.add(planet)
 
-        if nxt.name == 'SAN':
+        if planet.name == 'SAN':
             break
 
-        for child in nxt.children + [nxt.parent]:
-            if not child or child in seens:
-                continue
-            next_stack.append(child)
+        if planet.parent:
+            next_stack.append(planet.parent)
+        if planet.children:
+            next_stack.extend(planet.children)
 
     part2 = dist - 3
 

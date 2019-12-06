@@ -37,7 +37,7 @@ def day06(inp):
             # we're all done
             break
 
-        planet = stack.pop(-1)
+        planet = stack.pop()
         planet.inherit_orbits()
         bigtotal += planet.totorbits
 
@@ -51,7 +51,7 @@ def day06(inp):
     part1 = bigtotal
 
     # now do BFS from YOU
-    dist = 1
+    dist = 0
     stack = [me]
     next_stack = []
     seens = set()
@@ -64,7 +64,7 @@ def day06(inp):
         if not stack:
             # we're all done
             break
-        planet = stack.pop(-1)
+        planet = stack.pop()
 
         if planet in seens:
             continue
@@ -78,7 +78,7 @@ def day06(inp):
         if planet.children:
             next_stack.extend(planet.children)
 
-    part2 = dist - 3
+    part2 = dist - 2
 
     return part1, part2
 

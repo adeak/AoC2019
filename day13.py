@@ -28,6 +28,12 @@ class Intcode:
         self.outputs = []
         self.last_op = None
 
+    def export_state(self):
+        return self.src, self.ip, self.base, self.inputs, self.outputs, self.last_op
+
+    def import_state(self, state):
+        self.src, self.ip, self.base, self.inputs, self.outputs, self.last_op = state
+
     def pipe_into(self, other):
         self.pipe = other
 
@@ -39,7 +45,7 @@ class Intcode:
 
     @property
     def next_op(self):
-        """Tell what the next input instruction will be without stepping"""
+        """Peek at the next input instruction"""
         return self.ops[self.src[self.ip] % 100]
 
     def step(self):
@@ -140,43 +146,64 @@ class Intcode:
 class Solver:
     def __init__(self, src):
         self.src = src
-        self.choices = []
+        self.choices = []  # correct inputs to the intcode program
         self.score = 0
-        self.blocks_left = -1
+        self.total_blocks = None  # number of initial blocks; part 1
+        self.blocks_left = -1  # countdown until end of game
+        self.idle_steps = 10  # incremented steps to stand in one place for the next move
+        self.checkpoint = None  # state of the interpreter in a safe state
+        self.steps = 0  # steps taken for checkpoint
+        self.paddley = None  # constant y position of the paddle
 
     def find_next_choice(self):
         # first stand still, check where ball exits
-
         instance = Intcode(self.src)
-        instance.inputs.extend(self.choices + [0]*10000)
+        if self.checkpoint:
+            # load state from checkpoint
+            instance.import_state(self.checkpoint)
 
-        steps = 0
+        # but always override inputs (checkpoint inputs are noisy due to idle steps)
+        instance.inputs.clear()
+        instance.inputs.extend(self.choices + [0]*self.idle_steps)
+
+        steps = self.steps
         while True:
-            instance.step()
+            try:
+                instance.step()
+            except IndexError:
+                # retry with more steps of standing still
+                self.idle_steps *= 10
+                return
             
             if instance.last_op is None:
                 break
 
             if instance.last_op == 'in':
                 steps += 1
-                #print_board(instance.outputs)
-                #input()
 
-        scoreiter = (s for s,y,x in zip(*[reversed(instance.outputs)]*3) if (x,y) == (-1,0))
-        next(scoreiter)
-        self.score = next(scoreiter)
+                if steps == 1:
+                    # count number of initial blocks
+                    self.total_blocks = count_blocks(instance.outputs)
+
+                    # assumption: paddle y component is constant, store that too
+                    self.paddley = next(y for t,y,x in zip(*[reversed(instance.outputs)]*3) if t == 3)
+                elif steps == len(self.choices):
+                    # we are guaranteed to hit the paddle, checkpoint here
+                    self.checkpoint = instance.export_state()
+                    self.steps = steps
+
+
         self.blocks_left = count_blocks(instance.outputs)
-        print(f'blocks left: {self.blocks_left}, score: {self.score}')
         if not self.blocks_left:
-            # then we've won
+            # then we've won, need final score
             self.score = next(s for s,y,x in zip(*[reversed(instance.outputs)]*3) if (x,y) == (-1,0))
             return
 
-        # find where the paddle was
-        paddlex,paddley = next((x,y) for t,y,x in zip(*[reversed(instance.outputs)]*3) if t == 3)
+        # find where the paddle was when we died
+        paddlex = next(x for t,y,x in zip(*[reversed(instance.outputs)]*3) if t == 3)
 
         # find where the ball was two steps ago
-        ballx = next(x for t,y,x in zip(*[reversed(instance.outputs)]*3) if (t,y) == (4, paddley - 1))
+        ballx = next(x for t,y,x in zip(*[reversed(instance.outputs)]*3) if (t,y) == (4, self.paddley - 1))
 
         diff = ballx - paddlex
         sign = np.sign(diff)
@@ -186,7 +213,6 @@ class Solver:
         self.choices.extend([0] * buffers + [sign] * abs(diff))
         
         return
-
 
 def count_blocks(outputs):
     board = {(x,y):t for x,y,t in zip(*[iter(outputs)]*3) if (x,y) != (-1,0)}
@@ -202,42 +228,16 @@ def print_board(outputs):
     pixels[tuple(points.T)] = mapping[list(board.values())]  # assume ordered dicts
     print('\n'.join([''.join([c for c in row]) for row in np.rot90(pixels, -1).astype(str)]))
 
-def simulate_part1(src, choices=[]):
-    instance = Intcode(src)
-    instance.inputs.extend(choices)
-
-    while True:
-        instance.step()
-
-        # break if exit
-        if instance.last_op is None:
-            break
-
-        ## stop if input is requested in the next step
-        #if instance.next_op == 'in':
-        #    print_board(instance.outputs)
-        #    input()
-
-    return count_blocks(instance.outputs)
-
-def simulate_part2(src):
+def day13(inp):
+    src = list(map(int, inp.strip().split(',')))
     src[0] = 2
 
     solver = Solver(src)
     while solver.blocks_left:
         solver.find_next_choice()
-    return solver.score
-    #simulate_part1(src, solver.choices)
 
-def day13(inp):
-    src = list(map(int, inp.strip().split(',')))
-
-    part1 = simulate_part1(src)
-    part2 = simulate_part2(src)
-
-    return part1,part2
+    return solver.total_blocks, solver.score
 
 if __name__ == "__main__":
     inp = open('day13.inp').read()
     print(day13(inp))
-    # 10227 too low

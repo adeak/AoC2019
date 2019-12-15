@@ -181,10 +181,11 @@ def find_new_neighbs(oldpos, board, comp, states):
 
 def simulate(src, pos0=(0,0), state=None):
     comp = Intcode(src)
-    if not state:
-        state = comp.export_state()
     board = {}  # 0 is wall, 1 is visited free, 2 is target
     board[pos0] = -1  # starting point
+
+    if not state:
+        state = comp.export_state()
     states = {pos0: state}  # saves the instuction state for each new point
 
     to_visit = {pos0}
@@ -209,9 +210,9 @@ def print_board(board):
     points = np.array(list(board.keys()))
     size = points.ptp(0) + 1
     mins = points.min(0)
-    pixels = np.zeros(size, dtype='U1')
-    pixels[tuple(points.T)] = mapping[list(board.values())]  # assume ordered dicts
-    print('\n'.join([''.join([c for c in row]) for row in np.rot90(pixels, -1).astype(str)]))
+    pixels = np.full(size, fill_value=' ', dtype='U1')
+    pixels[tuple((points - mins).T)] = mapping[list(board.values())]  # assume ordered dicts
+    print('\n'.join([''.join([c for c in row]) for row in np.rot90(pixels).astype(str)]))
     print()
 
 def day15(inp):

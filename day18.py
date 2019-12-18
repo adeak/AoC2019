@@ -1,39 +1,9 @@
 from collections import defaultdict
-from itertools import count
+from itertools import count,product
 from string import ascii_uppercase as caps
 from string import ascii_lowercase as lowers
+import numpy as np  # only for printing
 
-# # working but too slow/too much memory:
-# def bfs_with_keys(board, pos0, num_keys):
-#     # each pathinfo is a (list_of_poses, list_of_keys) tuple
-#     # also keep track of visited positions with (pos, keys) sets
-#     pathinfos = [([pos0], [])]
-#     seens = {(pos0, frozenset())}
-#     for step in count(1):
-#         next_pathinfos = []
-#         for poses,keys in pathinfos:
-#             pos = poses[-1]
-#             for dx,dy in [(1,0), (0,-1), (-1,0), (0,1)]:
-#                 nextpos = pos[0] + dx, pos[1] + dy
-#                 if (nextpos, frozenset(keys)) in seens:
-#                     continue
-# 
-#                 c = board[nextpos]
-#                 if c == '.' or (c in caps and c.lower() in keys) or (c in keys):
-#                     # we can step but nothing else
-#                     next_pathinfos.append((poses + [nextpos], keys.copy()))
-#                     seens.add((nextpos, frozenset(keys)))
-#                 elif c in lowers:
-#                     # we've got a new key
-#                     nextkeys = keys + [c]
-#                     if len(nextkeys) == num_keys:
-#                         # we've found a shortest path
-#                         return step, nextkeys
-#                     next_pathinfos.append((poses + [nextpos], nextkeys))
-#                     seens.add((nextpos, frozenset(nextkeys)))
-# 
-#         pathinfos = next_pathinfos
-        
 def bfs_with_keys(board, pos0, num_keys):
     # keep track of the "seen key sets" at a given position,
     # use propagators starting at keys to spread keys,
@@ -92,7 +62,54 @@ def bfs_with_keys(board, pos0, num_keys):
             # this should never happen
             assert False, "We've never found all the keys..."
 
-def day18(inp):
+def bfs_to_target(board, start, target, keys, ignore_doors):
+    """Walk on the board from a given starting point until target, given keys"""
+    seens = set()
+    pos = start
+    edges = {pos}
+    for steps in count(1):
+        next_edges = set()
+        for pos in edges:
+            for dx,dy in [(1,0), (0,-1), (-1,0), (0,1)]:
+                nextpos = pos[0] + dx, pos[1] + dy
+                if nextpos in seens:
+                    continue
+
+                c = board[nextpos]
+                if c == target:
+                    keys.add(target)
+                    return steps, nextpos
+                if c == '#':
+                    # wall
+                    continue
+                elif c == '.' or (c in caps and c.lower() in keys) or (c in ignore_doors) or (c in lowers):
+                    # just step, ignore decoration
+                    next_edges.add(nextpos)
+                    seens.add(nextpos)
+                    continue
+                elif c in caps:
+                    assert False, f'Unexpected door {c} from {start}, only have keys {keys}!'
+                else:
+                    assert False, f'Impossible case {c}!'
+        edges = next_edges
+
+        if not edges:
+            # should not happen
+            break
+
+    assert False, f'Ran out of maze looking for target {target} starting from {start}!'
+
+
+def print_board(board):
+    points = np.array(list(board.keys()))
+    size = points.ptp(0) + 1
+    mins = points.min(0)
+    pixels = np.full(size, fill_value=' ', dtype='U1')
+    pixels[tuple((points - mins).T)] = list(board.values())
+    print('\n'.join([''.join([c for c in row]) for row in pixels.astype(str)]))
+    print()
+
+def day18(inp, no_part2=False):
     board = {}
     num_keys = 0
     for row,line in enumerate(inp.strip().splitlines()):
@@ -106,13 +123,59 @@ def day18(inp):
                 num_keys += 1
     # "up" is [0,-1] direction
 
-    shortest = bfs_with_keys(board, start, num_keys)
+    # part 1
+    part1 = bfs_with_keys(board, start, num_keys)
 
-    return shortest
+    # part 2 reconfiguration
+    for x,y in product(range(start[0] - 1, start[0] + 2), range(start[1] - 1, start[1] + 2)):
+        if abs(x - start[0]) == abs(y - start[1]) == 1:
+            board[x,y] = '.'  # these would be @
+        else:
+            board[x,y] = '#'
+
+    #print_board(board)
+
+    if no_part2:
+        # part1 test input
+        return part1, None
+
+    # manual part 2 for now
+    targetses = [
+            ('TR', 'zlgat'),
+            ('TL', 'ho'),
+            ('BR', 'sx'),
+            ('BL', 'pv'),
+            ('TL', 'md'),
+            ('BL', 'yq'),
+            ('TR', 'rw'),
+            ('BL', 'k'),
+            ('BR', 'ic'),
+            ('TL', 'e'),
+            ('TR', 'bnufj'),
+            ]
+    ignore_doors = 'SLXJIRGM'
+
+    poses = {'TL': (start[0] - 1, start[1] - 1),
+             'TR': (start[0] - 1, start[1] + 1),
+             'BL': (start[0] + 1, start[1] - 1),
+             'BR': (start[0] + 1, start[1] + 1)
+             }
+
+    tot_steps = 0
+    keys = set()
+    for quadrant, targets in targetses:
+        for target in targets:
+            steps,pos = bfs_to_target(board, poses[quadrant], target, keys, ignore_doors)
+            tot_steps += steps
+            poses[quadrant] = pos
+    assert len(keys) == num_keys
+    part2 = tot_steps
+
+    return part1, part2
 
 
 if __name__ == "__main__":
     testinp = open('day18.testinp').read()
-    print(day18(testinp))
+    print(day18(testinp, no_part2=True))
     inp = open('day18.inp').read()
     print(day18(inp))

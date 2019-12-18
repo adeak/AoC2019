@@ -29,10 +29,13 @@ class Intcode:
         self.last_op = None
 
     def export_state(self):
-        return self.src, self.ip, self.base, self.inputs, self.outputs, self.last_op
+        return self.src.copy(), self.ip, self.base, self.inputs.copy(), self.outputs.copy(), self.last_op
 
     def import_state(self, state):
-        self.src, self.ip, self.base, self.inputs, self.outputs, self.last_op = state
+        src, self.ip, self.base, inputs, outputs, self.last_op = state
+        self.src = src.copy()
+        self.inputs = inputs.copy()
+        self.outputs = outputs.copy()
 
     def pipe_into(self, other):
         self.pipe = other
@@ -78,7 +81,7 @@ class Intcode:
             n_inps = 1
             n_outs = 0
         else:
-            assert False, f'Invalid opcode {opcode} at position {i}!'
+            assert False, f'Invalid opcode {opcode} at position {ip}!'
     
         op = self.ops.get(opcode, -1)
         assert op != -1, f'Need to implement more operations in ops dict!'
@@ -148,6 +151,7 @@ class Solver:
         self.src = src
         self.choices = []  # correct inputs to the intcode program
         self.score = 0
+        self.simulating = False  # flipped to True once there's an input
         self.total_blocks = None  # number of initial blocks; part 1
         self.blocks_left = -1  # countdown until end of game
         self.idle_steps = 10  # incremented steps to stand in one place for the next move
@@ -164,7 +168,7 @@ class Solver:
 
         # but always override inputs (checkpoint inputs are noisy due to idle steps)
         instance.inputs.clear()
-        instance.inputs.extend(self.choices + [0]*self.idle_steps)
+        instance.inputs.extend(self.choices[self.steps:] + [0]*self.idle_steps)
 
         steps = self.steps
         while True:
@@ -175,23 +179,33 @@ class Solver:
                 self.idle_steps *= 10
                 return
             
-            if instance.last_op is None:
+            if instance.last_op is None and steps > self.steps:
                 break
 
+            if not self.simulating and instance.last_op == 'in':
+                self.simulating = True
+                # count number of initial blocks
+                self.total_blocks = count_blocks(instance.outputs)
+
+                # assumption: paddle y component is constant, store that too
+                self.paddley = next(y for t,y,x in zip(*[reversed(instance.outputs)]*3) if t == 3)
+
             if instance.last_op == 'in':
+                # check state when input is requested for consistent ball-and-paddle state
                 steps += 1
 
-                if steps == 1:
-                    # count number of initial blocks
-                    self.total_blocks = count_blocks(instance.outputs)
+                ballx,bally = next((x,y) for t,y,x in zip(*[reversed(instance.outputs)]*3) if t == 4 and (x,y) != (-1,0))
 
-                    # assumption: paddle y component is constant, store that too
-                    self.paddley = next(y for t,y,x in zip(*[reversed(instance.outputs)]*3) if t == 3)
-                elif steps == len(self.choices):
-                    # we are guaranteed to hit the paddle, checkpoint here
-                    self.checkpoint = instance.export_state()
-                    self.steps = steps
 
+                # check if we hit it; if yes: checkpoint
+                if bally == self.paddley - 1:
+                    paddlex = next(x for t,y,x in zip(*[reversed(instance.outputs)]*3) if t == 3 and (x,y) != (-1,0))
+
+                    if ballx == paddlex:
+                        self.checkpoint = instance.export_state()
+                        self.steps = steps
+                        self.choices = (self.choices + [0]*self.idle_steps)[:self.steps]
+                        return
 
         self.blocks_left = count_blocks(instance.outputs)
         if not self.blocks_left:
@@ -200,14 +214,14 @@ class Solver:
             return
 
         # find where the paddle was when we died
-        paddlex = next(x for t,y,x in zip(*[reversed(instance.outputs)]*3) if t == 3)
+        paddlex = next(x for t,y,x in zip(*[reversed(instance.outputs)]*3) if t == 3 and (x,y) != (-1,0))
 
-        # find where the ball was two steps ago
+        # find where the ball was above the paddle's level
         ballx = next(x for t,y,x in zip(*[reversed(instance.outputs)]*3) if (t,y) == (4, self.paddley - 1))
 
         diff = ballx - paddlex
         sign = np.sign(diff)
-        buffers = steps - 1 - len(self.choices) - abs(diff)
+        buffers = steps - self.steps - 1 - len(self.choices) - abs(diff)
 
         # pad with zeros, then take the number of required steps
         self.choices.extend([0] * buffers + [sign] * abs(diff))

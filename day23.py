@@ -1,8 +1,8 @@
 from collections import deque
 from intcode import Intcode
 
-# coroutine-ify the processes: yield on input and output
-def proc_coro(comp, addr, msgs):
+# generatorify the processes: yield on input and output
+def proc_gen(comp, addr, msgs):
     last_len = 0  # last output stream length
     
     # initialize with address
@@ -30,14 +30,13 @@ def proc_coro(comp, addr, msgs):
 
 def simulate(src, num_procs=50):
     comps = {addr: Intcode(src) for addr in range(num_procs)}
-    coros = {}
+    gens = {}
     msgs = {}
     for addr,comp in comps.items():
-        # initialize coroutines with address and message queue
+        # initialize generators with address and message queue
         msgs[addr] = []
-        coro = proc_coro(comp, addr, msgs[addr])
-        coros[addr] = coro
-        coro.send(None)
+        gen = proc_gen(comp, addr, msgs[addr])
+        gens[addr] = gen
 
     last_buffer = None  # for part 2
     last_sent = None  # for part 2
@@ -45,10 +44,10 @@ def simulate(src, num_procs=50):
     have_msgs = deque([True, True], maxlen=2)  # check if there were new msgs during iteration in two successive passes
     while True:
         have_msgs_now = False
-        for addr,coro in coros.items():
+        for addr,gen in gens.items():
             try:
-                # step with the coro
-                retval = next(coro)
+                # step with the generator
+                retval = next(gen)
             except StopIteration:
                 # this process stopped (not really relevant)
                 halteds.add(addr)
@@ -57,7 +56,7 @@ def simulate(src, num_procs=50):
                     # then we have output
                     to, *xy = retval
 
-                    if to in coros:
+                    if to in gens:
                         # send it to the process
                         msgs[to].extend(xy)
                         have_msgs_now = True
@@ -72,8 +71,8 @@ def simulate(src, num_procs=50):
         have_msgs.append(have_msgs_now)
 
         # filter out finished processes, if any
-        coros = {addr: coro for addr,coro in coros.items() if addr not in halteds}
-        if not coros:
+        gens = {addr: gen for addr,gen in gens.items() if addr not in halteds}
+        if not gens:
             break
 
         # check for part 2

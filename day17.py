@@ -204,12 +204,12 @@ def print_board(board):
 def day17(inp, testing=False):
     if testing:
         # output is passed as input, don't simulate
-        part1 = simulate(None, outputs=inp.encode('ascii'))
+        part12 = simulate(None, outputs=inp.encode('ascii'))
     else:
         src = list(map(int, inp.strip().split(',')))
-        part1 = simulate(src)
+        part12 = simulate(src)
 
-    return part1
+    return part12
 
 if __name__ == "__main__":
     testinp = open('day17.testinp').read()
